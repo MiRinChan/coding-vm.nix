@@ -171,4 +171,4 @@ tests/                        配置、磁盘、网络和GPU测试
 
 ## 许可证
 
-待定，尚未添加LICENSE文件或授予开源许可证。
+本项目采用[PolyForm Noncommercial 1.0.0](LICENSE)。
