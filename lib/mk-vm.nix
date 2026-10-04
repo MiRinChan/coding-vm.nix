@@ -91,6 +91,7 @@
         else "0"
       }
       export VM_DISK_SIZE_MB=${toString vmConfig.virtualisation.diskSize}
+      export VM_CONTROL_HELPER=${../scripts/vm-runtime.py}
       export VM_DISK_PREPARER=${../scripts/prepare-vm-disk.sh}
       exec bash ${../scripts/run-vm.sh}
 
@@ -101,7 +102,7 @@ in {
   effectiveSettings = vmSettings;
   behaviorManifest = {
     settings = vmSettings;
-    launcherPolicyVersion = 1;
+    launcherPolicyVersion = 2;
     effective = {
       inherit (vmConfig.virtualisation) cores memorySize diskSize writableStore writableStoreUseTmpfs;
       timeZone = vmConfig.time.timeZone;

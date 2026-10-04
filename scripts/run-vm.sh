@@ -81,6 +81,9 @@ if ! flock -n 9; then
 	echo "A VM launcher already holds $VM_STATE_DIR/launch.lock." >&2
 	exit 1
 fi
+control_env="$(python3 "$VM_CONTROL_HELPER" --state-dir "$VM_STATE_DIR" prepare)"
+eval "$control_env"
+ln -sfn "$(command -v python3)" "$VM_STATE_DIR/runtime-python"
 bash "$VM_DISK_PREPARER"
 
 # Keep roots outside the flake source and retain previous VM generations.
@@ -227,7 +230,7 @@ Host $host
 # END $host managed
 EOF
 
-if [ "${OPEN_VSCODE:-1}" = "1" ]; then
+if [ "${OPEN_VSCODE:-0}" = "1" ]; then
 	if ! command -v code >/dev/null 2>&1; then
 		echo "Cannot find host VS Code 'code' command."
 		echo "In host VS Code, run: Shell Command: Install 'code' command in PATH"
@@ -266,6 +269,8 @@ systemd-run --user --unit="$vm_scope_unit" --service-type=exec \
 	--setenv="QEMU_OPTS=${QEMU_OPTS:-}" \
 	--setenv="VM_SSH_PORT=$port" \
 	--setenv="QEMU_KERNEL_PARAMS=${QEMU_KERNEL_PARAMS:-}" \
+	--setenv="VM_CONSOLE_SOCKET=$VM_CONSOLE_SOCKET" --setenv="VM_CONSOLE_LOG=$VM_CONSOLE_LOG" \
+	--setenv="VM_QMP_SOCKET=$VM_QMP_SOCKET" --setenv="VM_PID_FILE=$VM_PID_FILE" \
 	"$vm_runner" </dev/null >"$vm_log" 2>&1 &
 vm_pid="$!"
 network_guard_pid=""
@@ -373,19 +378,25 @@ if ! ssh "${ssh_probe[@]}" true >/dev/null 2>&1; then
 	echo "  ssh -vvv -p $port -i $key -o UserKnownHostsFile=$known_hosts $user@127.0.0.1 true" >&2
 	echo "Last QEMU log lines:" >&2
 	safe_tail 120 >&2 || true
-	exit 1
+	echo "VM remains running. Use console.sh to inspect it, or stop.sh to shut it down."
+	wait "$vm_pid"
+	exit $?
 fi
 
 # Check store registrations before opening clients.
 echo "Checking the guest Nix database after boot..."
-ssh "${ssh_probe[@]}" 'sudo -n nix-store --verify'
+if ! ssh "${ssh_probe[@]}" 'sudo -n nix-store --verify'; then
+	echo "Guest Nix check failed. VM remains running. Use console.sh to inspect it." >&2
+	wait "$vm_pid"
+	exit $?
+fi
 
 if [ "${RESET_VSCODE_SERVER:-0}" = "1" ]; then
 	echo "Resetting VS Code server directories inside the VM..."
 	ssh "${ssh_probe[@]}" 'rm -rf ~/.vscode-server ~/.vscode-server-insiders ~/.vscode-remote'
 fi
 
-if [ "${OPEN_KITTY_SSH:-1}" = "1" ] && command -v kitty >/dev/null 2>&1; then
+if [ "${OPEN_KITTY_SSH:-0}" = "1" ] && command -v kitty >/dev/null 2>&1; then
 	echo "Opening kitty SSH session..."
 	if [ -n "${KITTY_WINDOW_ID:-}" ]; then
 		kitty @ launch --type=tab --tab-title "$host" ssh "$host" 9>&- >/dev/null 2>&1 ||
@@ -409,7 +420,7 @@ if [ "${MOUNT_SSHFS:-1}" = "1" ]; then
 			-o UserKnownHostsFile="$known_hosts" 9>&-
 	fi
 fi
-if [ "${OPEN_VSCODE:-1}" = "1" ]; then
+if [ "${OPEN_VSCODE:-0}" = "1" ]; then
 
 	echo "Opening host VS Code and connecting to $host:$VM_FS_REMOTE ..."
 	code --folder-uri "vscode-remote://ssh-remote+$host$VM_FS_REMOTE" 9>&- >/dev/null 2>&1 &

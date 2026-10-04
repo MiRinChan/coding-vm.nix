@@ -143,8 +143,11 @@ class Manager:
                 raise RuntimeError("Initialize the instance first: ./vm init")
             old = json.loads((current / "manifest.json").read_text())["settings"]
             settings = self.defaults(source)
-            for key in ("system", "user", "hostName", "launcher", "systemStateVersion"):
+            for key in ("system", "user", "hostName", "systemStateVersion"):
                 settings[key] = old[key]
+            for key in ("sshAlias", "sshPort", "sshKey", "fsMountDir", "fsRemote"):
+                if key in old["launcher"]:
+                    settings["launcher"][key] = old["launcher"][key]
             text = nix_value(settings)
         else:
             if not current:

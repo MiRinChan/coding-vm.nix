@@ -6,6 +6,8 @@
   defaults =
     if version == 1
     then import ../profiles/v1.nix
+    else if version == 2
+    then import ../profiles/v2.nix
     else throw "Unsupported defaultsVersion ${toString version}. Keep the existing generation or migrate its settings.";
   unknown = path: supplied: expected:
     lib.concatMap (

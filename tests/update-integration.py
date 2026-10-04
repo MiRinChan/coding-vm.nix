@@ -39,18 +39,24 @@ with tempfile.TemporaryDirectory(prefix="coding-vm-update-") as temporary:
     commit()
     vm("init")
     original = manifest()
-    assert original["settings"]["defaultsVersion"] == 1
+    assert original["settings"]["defaultsVersion"] == 2
+    assert original["settings"]["launcher"]["openVSCode"] is False
+    assert original["settings"]["launcher"]["openKitty"] is False
     profile = (checkout / "profiles/v1.nix").read_text()
-    (checkout / "profiles/v2.nix").write_text(profile.replace("defaultsVersion = 1;", "defaultsVersion = 2;").replace("America/Los_Angeles", "America/New_York").replace("preallocateDisk = false;", "preallocateDisk = true;"))
-    (checkout / "settings.nix").write_text("import ./profiles/v2.nix\n")
+    (checkout / "profiles/v3.nix").write_text(profile.replace("defaultsVersion = 1;", "defaultsVersion = 3;").replace("America/Los_Angeles", "America/New_York").replace("preallocateDisk = false;", "preallocateDisk = true;"))
+    (checkout / "settings.nix").write_text("import ./profiles/v3.nix\n")
     normalizer = checkout / "lib/normalize-settings.nix"
-    normalizer.write_text(normalizer.read_text().replace("else throw", "else if version == 2 then import ../profiles/v2.nix else throw"))
+    normalizer.write_text(normalizer.read_text().replace("else throw", "else if version == 3 then import ../profiles/v3.nix else throw"))
     commit()
     vm("update", "--no-fetch")
     assert manifest() == original, "Ordinary update changed the instance defaults"
     vm("upgrade-defaults", "--no-fetch", "--yes")
     upgraded = manifest()["settings"]
-    assert upgraded["defaultsVersion"] == 2
+    assert upgraded["defaultsVersion"] == 3
+    assert upgraded["launcher"]["openVSCode"] is True
+    assert upgraded["launcher"]["openKitty"] is True
+    for key in ("sshAlias", "sshPort", "sshKey", "fsMountDir", "fsRemote"):
+        assert upgraded["launcher"][key] == original["settings"]["launcher"][key]
     assert upgraded["resources"]["preallocateDisk"] is True
     assert upgraded["spoofSettings"]["region"]["timeZone"] == "America/New_York"
     vm("rollback")

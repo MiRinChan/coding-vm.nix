@@ -2,7 +2,7 @@
 
 用NixOS和QEMU运行开发虚拟机，给开发工具和coding agent提供固定的Linux环境。
 
-预装Git、Node.js、Python、GitHub CLI、VS Code和Claude Code。通过SSH连接，桌面客户端可以单独关闭。
+预装Git、Node.js、Python、GitHub CLI、VS Code和Claude Code。通过SSH或串口控制台连接。默认不自动打开桌面客户端。
 
 ## 使用
 
@@ -18,7 +18,7 @@ cd coding-vm.nix
 
 默认分配8个CPU、16GiB内存和80GiB磁盘，使用CachyOS BORE内核。首次启动会创建稀疏磁盘，宿主磁盘占用随虚拟机写入增长。
 
-启动器会配置SSH连接、安装VS Code Remote-SSH扩展、打开kitty和VS Code，并用SSHFS挂载虚拟机家目录。退出启动器会停止虚拟机。
+启动器会配置SSH连接，并用SSHFS挂载虚拟机家目录。需要正常关机时，运行`./stop.sh`。退出启动器会停止虚拟机。
 
 | 项目 | 默认值 |
 |---|---|
@@ -31,17 +31,40 @@ cd coding-vm.nix
 
 家目录和工作文件保存在磁盘中。可写store使用tmpfs，新增store内容不跨重启保存。可通过实例设置中的`storage.writableStoreUseTmpfs`调整。
 
-### 只使用SSH
+### 桌面客户端
+
+默认使用`OPEN_VSCODE=0 OPEN_KITTY_SSH=0`。需要自动打开客户端时，运行：
 
 ```sh
-OPEN_VSCODE=0 OPEN_KITTY_SSH=0 MOUNT_SSHFS=0 ./start.sh
+OPEN_VSCODE=1 OPEN_KITTY_SSH=1 ./start.sh
 ```
+
+启用VS Code时，启动器会安装Remote-SSH扩展。只需SSH连接时，可用`MOUNT_SSHFS=0 ./start.sh`关闭文件挂载。
 
 启动器仍会检查虚拟机的Nix数据库。SSH设置写入宿主`~/.ssh/config`中的`coding-vm`块。
 
 `VM_SSH_PORT`、`VM_STATE_DIR`、`VM_SSH_KEY`和`VM_FS_MOUNT_DIR`可以覆盖默认值。多个实例需要使用不同的磁盘目录、SSH端口和`launcher.sshAlias`。
 
 可以在本地`.instance-state`文件中保存实例目录路径。所有管理命令都会读取它，`VM_STATE_DIR`仍可覆盖该路径。此文件不会提交到Git。
+
+## 关机、状态和控制台
+
+```sh
+./stop.sh             # 请求正常关机，并等待QEMU退出
+./status.sh           # 查看当前开关机状态和控制台是否可用
+./status.sh --json    # 输出机器可读的状态
+./console.sh          # 连接本地串口终端
+```
+
+关机脚本通过QMP发送电源按钮事件，不需要SSH。默认等待120秒，超时后保留运行中的VM。可用`./stop.sh --timeout 300`延长等待时间。旧启动器没有QMP时，会尝试通过原SSH连接正常关机。
+
+控制台可用于开机过程、网络故障和SSH服务不可用时。VM需要运行。按Enter显示登录提示，使用实例用户名和密码登录。新实例默认用户名为`alice`，初始密码为`change-me`。密码可在`security.initialPassword`中配置。
+
+按`Ctrl-]`断开控制台，VM继续运行。`Ctrl-C`会发送给虚拟机里的程序。串口不传递窗口大小变化或SSH扩展功能，同一时刻只连接一个终端。
+
+SSH等待超时或启动后的Nix检查失败时，启动器保留VM，供控制台排查。串口输出保存在实例的`logs/console.log`。旧启动器需在下次启动时加载新版本，才能提供串口控制台。
+
+控制脚本使用启动时保存的Python解释器，不求值或构建flake。首次启动前，宿主需提供Python3；脚本也可通过项目的tools环境运行。
 
 ## 修改配置
 
@@ -90,13 +113,13 @@ spoofSettings.enable = true;
 ./vm rollback         # 恢复上一版构建和实例设置
 ```
 
-`defaultsVersion`选择一份固定的默认配置。目前为`1`。普通更新保留此版本及全部实例设置。新增默认值应放在新的`profiles/vN.nix`中，保留已有版本。
+`defaultsVersion`选择一份固定的默认配置。新实例使用`2`，默认关闭桌面客户端。`1`保留原默认值。普通更新保留此版本及全部实例设置。新增默认值应放在新的`profiles/vN.nix`中，保留已有版本。
 
 更新会比较资源、存储、网络、地区、SSH、权限、软件列表和启动器策略。如果行为发生变化，会显示差异并停止。确认差异后，可执行`./vm update --accept-behavior-changes`。软件版本变化单独显示。构建失败时继续使用原版本。
 
 采用新版默认值会保留用户名、主机名、架构、连接设置及`systemStateVersion`，其余设置可能改变。命令会先显示这些变化，需确认后才构建。
 
-这些命令不会停止运行中的虚拟机。需要应用新版本时，退出原启动器，再运行`./start.sh`。回滚恢复配置和构建，不恢复磁盘内容，也不撤销已经执行的磁盘扩容。
+这些命令不会停止运行中的虚拟机。需要应用新版本时，运行`./stop.sh`，再运行`./start.sh`。回滚恢复配置和构建，不恢复磁盘内容，也不撤销已经执行的磁盘扩容。
 
 实例文件、依赖锁文件和构建记录保存在`.vm-state/manager/`。每次成功更新保留当前和上一版构建的GC引用。Git工作区有未提交修改时，更新会停止。
 
@@ -109,7 +132,9 @@ nix develop --accept-flake-config path:.#tools --command bash -c 'nix flake chec
 nix develop --accept-flake-config path:.#tools --command bash tests/run.sh
 nix develop --accept-flake-config path:.#tools --command bash tests/passt-bind-failure.sh
 nix develop --accept-flake-config path:.#tools --command python3 tests/test-manager.py
+nix develop --accept-flake-config path:.#tools --command python3 tests/test-runtime.py
 nix develop --accept-flake-config path:.#tools --command python3 tests/update-integration.py
+nix develop --accept-flake-config path:.#tools --command python3 tests/console-integration.py
 ```
 
 这些检查不会启动虚拟机。磁盘测试使用临时目录。
@@ -127,7 +152,9 @@ flake.nix、flake.lock          构建入口和依赖版本
 settings.nix                  新实例模板
 profiles/                     按defaultsVersion固定的默认值
 lib/                          实例构建和设置合并
-vm                            实例管理命令
+vm                            实例更新与配置管理
+start.sh、stop.sh、status.sh   启动、正常关机和当前状态
+console.sh                    串口终端
 templates/instance/           独立flake模板
 hosts/coding-vm.nix            模块组合
 modules/system/               Nix基础设置、用户和SSH
