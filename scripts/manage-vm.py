@@ -45,6 +45,20 @@ def atomic_text(path, text):
     temporary.replace(path)
 
 
+def state_directory(project, explicit=None):
+    if explicit is not None:
+        return explicit
+    if os.environ.get("VM_STATE_DIR"):
+        return Path(os.environ["VM_STATE_DIR"])
+    pointer = project / ".instance-state"
+    if pointer.is_file():
+        return project / pointer.read_text().strip()
+    legacy = project / ".vm-state"
+    if legacy.is_dir():
+        return legacy
+    return Path.home() / ".local/state/coding-vm"
+
+
 class Manager:
     def __init__(self, project, state):
         self.project = project.resolve()
@@ -213,11 +227,7 @@ def main():
     project = args.project.resolve()
     if not (project / "templates/instance/flake.nix").exists() and (project / "modular/.git").exists():
         project = project / "modular"
-    pointer = project / ".instance-state"
-    default_state = project / ".vm-state"
-    if pointer.is_file():
-        default_state = project / pointer.read_text().strip()
-    state = args.state_dir or Path(os.environ.get("VM_STATE_DIR", str(default_state)))
+    state = state_directory(project, args.state_dir)
     manager = Manager(project, state)
     launcher = None
     with manager.locked():

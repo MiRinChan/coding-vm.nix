@@ -25,7 +25,7 @@ cd coding-vm.nix
 | SSH别名 | `coding-vm` |
 | SSH端口 | `2223` |
 | SSH私钥 | `~/.ssh/coding-vm_ed25519` |
-| 磁盘及日志 | `.vm-state/` |
+| 磁盘及日志 | `~/.local/state/coding-vm/` |
 | 文件系统入口 | `virtualMachine` |
 | systemd用户服务 | `coding-vm-qemu-<PID>` |
 
@@ -45,7 +45,9 @@ OPEN_VSCODE=1 OPEN_KITTY_SSH=1 ./start.sh
 
 `VM_SSH_PORT`、`VM_STATE_DIR`、`VM_SSH_KEY`和`VM_FS_MOUNT_DIR`可以覆盖默认值。多个实例需要使用不同的磁盘目录、SSH端口和`launcher.sshAlias`。
 
-可以在本地`.instance-state`文件中保存实例目录路径。所有管理命令都会读取它，`VM_STATE_DIR`仍可覆盖该路径。此文件不会提交到Git。
+默认状态目录位于`~/.local/state/coding-vm/`，磁盘和日志保存在源码目录之外。可以在本地`.instance-state`文件中保存其他实例目录路径。所有管理命令都会读取它，`VM_STATE_DIR`仍可覆盖该路径。此文件不会提交到Git。
+
+已有项目中的`.vm-state/`会继续使用原路径。新实例才使用新的默认目录。多个项目默认共享`~/.local/state/coding-vm/`，独立实例需设置各自的`VM_STATE_DIR`或`.instance-state`。
 
 ## 关机、状态和控制台
 
@@ -68,7 +70,7 @@ SSH等待超时或启动后的Nix检查失败时，启动器保留VM，供控制
 
 ## 修改配置
 
-首次启动会把默认值保存到`.vm-state/manager/settings.nix`。用户、资源、软件、GPU节点和地区预设都在这个实例文件中。
+首次启动会把默认值保存到`~/.local/state/coding-vm/manager/settings.nix`。用户、资源、软件、GPU节点和地区预设都在这个实例文件中。
 
 ```sh
 ./vm config  # 显示实例设置路径
@@ -121,7 +123,7 @@ spoofSettings.enable = true;
 
 这些命令不会停止运行中的虚拟机。需要应用新版本时，运行`./stop.sh`，再运行`./start.sh`。回滚恢复配置和构建，不恢复磁盘内容，也不撤销已经执行的磁盘扩容。
 
-实例文件、依赖锁文件和构建记录保存在`.vm-state/manager/`。每次成功更新保留当前和上一版构建的GC引用。Git工作区有未提交修改时，更新会停止。
+实例文件、依赖锁文件和构建记录保存在`~/.local/state/coding-vm/manager/`。每次成功更新保留当前和上一版构建的GC引用。Git工作区有未提交修改时，更新会停止。
 
 ## 检查
 

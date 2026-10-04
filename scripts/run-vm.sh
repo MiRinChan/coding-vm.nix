@@ -60,8 +60,18 @@ if [ -x /run/wrappers/bin/fusermount3 ]; then
 fi
 
 # Keep VM runtime state away from the mounted filesystem.
-export VM_STATE_DIR="${VM_STATE_DIR:-$project_root/.vm-state}"
+if [ -z "${VM_STATE_DIR:-}" ]; then
+	if [ -f "$project_root/.instance-state" ]; then
+		VM_STATE_DIR="$(cat "$project_root/.instance-state")"
+		[[ "$VM_STATE_DIR" = /* ]] || VM_STATE_DIR="$project_root/$VM_STATE_DIR"
+	elif [ -d "$project_root/.vm-state" ]; then
+		VM_STATE_DIR="$project_root/.vm-state"
+	else
+		VM_STATE_DIR="$HOME/.local/state/coding-vm"
+	fi
+fi
 VM_STATE_DIR="$(realpath -m "$VM_STATE_DIR")"
+export VM_STATE_DIR
 export NIX_DISK_IMAGE="$VM_STATE_DIR/nixos.qcow2"
 
 # First boot can be slow while the image and host keys are initialized.

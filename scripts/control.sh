@@ -6,8 +6,10 @@ if [ -z "$state" ]; then
 	if [ -f "$project_root/.instance-state" ]; then
 		state="$(cat "$project_root/.instance-state")"
 		[[ "$state" = /* ]] || state="$project_root/$state"
-	else
+	elif [ -d "$project_root/.vm-state" ]; then
 		state="$project_root/.vm-state"
+	else
+		state="$HOME/.local/state/coding-vm"
 	fi
 fi
 if [ -x "$state/runtime-python" ]; then

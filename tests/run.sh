@@ -103,6 +103,7 @@ test_exit_node_networking() {
 	ok "IPv4 and IPv6 use passt sockets bound to Tailscale"
 }
 
+python3 tests/test-state-directory.py
 test_ssh_cleanup_removes_all_vm_blocks
 test_exit_node_networking
 bash tests/disk-preallocation.sh
