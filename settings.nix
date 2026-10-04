@@ -6,6 +6,7 @@
     cores = 8;
     memoryMiB = 16 * 1024;
     diskMiB = 80 * 1024;
+    preallocateDisk = false;
   };
   gpu.renderNode = "/dev/dri/renderD128";
   # Optional region and Tailscale egress preset.

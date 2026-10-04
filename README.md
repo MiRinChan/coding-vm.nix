@@ -16,7 +16,7 @@ cd coding-vm.nix
 ./start.sh
 ```
 
-默认分配8个CPU、16GiB内存和80GiB磁盘，使用CachyOS BORE内核。首次启动会创建磁盘并预分配宿主磁盘空间。
+默认分配8个CPU、16GiB内存和80GiB磁盘，使用CachyOS BORE内核。首次启动会创建稀疏磁盘，宿主磁盘占用随虚拟机写入增长。
 
 启动器会配置SSH连接、安装VS Code Remote-SSH扩展、打开kitty和VS Code，并用SSHFS挂载虚拟机家目录。退出启动器会停止虚拟机。
 
@@ -44,6 +44,16 @@ OPEN_VSCODE=0 OPEN_KITTY_SSH=0 MOUNT_SSHFS=0 ./start.sh
 ## 修改配置
 
 用户、资源、GPU节点和地区预设在`settings.nix`中。预装软件在`modules/environment/development.nix`中。
+
+### 磁盘预分配
+
+默认关闭预分配。需要预留宿主磁盘空间时，在`settings.nix`中设置：
+
+```nix
+resources.preallocateDisk = true;
+```
+
+此设置用于创建、扩容和准备已有磁盘。关闭它不会回收已有磁盘分配的空间，也不会缩小磁盘。
 
 ### 地区和网络
 

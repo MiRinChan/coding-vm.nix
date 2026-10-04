@@ -60,6 +60,11 @@
         }
         export VM_BUILD=${vmDrv}
         export VM_RUNNER_DIR=${vmDrv}/bin
+        export VM_DISK_PREALLOCATE=${
+          if vmSettings.resources.preallocateDisk
+          then "1"
+          else "0"
+        }
         export VM_DISK_SIZE_MB=${toString vmConfig.virtualisation.diskSize}
         export VM_DISK_PREPARER=${./scripts/prepare-vm-disk.sh}
         exec bash ${./scripts/run-vm.sh}
