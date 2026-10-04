@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+export VM_SSH_ALIAS=coding-vm
 
 fail() {
 	printf 'FAIL: %s\n' "$*" >&2

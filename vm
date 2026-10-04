@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+project_root="$(dirname "$(realpath "$0")")"
+exec nix develop --accept-flake-config "$project_root#tools" \
+	--command python3 "$project_root/scripts/manage-vm.py" --project "$project_root" "$@"

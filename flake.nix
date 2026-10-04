@@ -14,96 +14,46 @@
     nixpkgs,
     cachyos-kernel,
   }: let
-    vmSettings = import ./settings.nix;
-    system = vmSettings.system;
-
-    pkgs = import nixpkgs {
-      inherit system;
-    };
-
-    vmConfig = self.nixosConfigurations.coding-vm.config;
-    vmDrv = vmConfig.system.build.vm;
-
-    runVm = pkgs.writeShellApplication {
+    defaultSettings = import ./settings.nix;
+    system = defaultSettings.system;
+    pkgs = import nixpkgs {inherit system;};
+    mkVM = settings: import ./lib/mk-vm.nix {inherit nixpkgs cachyos-kernel settings;};
+    defaultVM = mkVM defaultSettings;
+    managedVm = pkgs.writeShellApplication {
       name = "run-vm";
-
-      runtimeInputs = [
-        pkgs.coreutils
-        pkgs.findutils
-        pkgs.fuse3
-        pkgs.gawk
-        pkgs.gnugrep
-        pkgs.gnused
-        pkgs.kitty
-        pkgs.nix
-        pkgs.qemu_kvm
-        pkgs.e2fsprogs
-        pkgs.iproute2
-        pkgs.tailscale
-        pkgs.openssh
-        pkgs.python3
-        pkgs.sshfs
-        pkgs.systemd
-        pkgs.util-linux
-      ];
-
+      runtimeInputs = [pkgs.python3 pkgs.git pkgs.nix];
       text = ''
-        export CODING_VM_PROJECT_ROOT="''${CODING_VM_PROJECT_ROOT:-$PWD}"
-        export VM_USER=${vmSettings.user}
-        export VM_NETWORK_INTERFACE=${vmSettings.spoofSettings.network.interface}
-        export VM_DNS4=${vmSettings.spoofSettings.network.dns4}
-        export VM_DNS6=${vmSettings.spoofSettings.network.dns6}
-        export VM_REQUIRE_TAILSCALE_EXIT=${
-          if vmSettings.spoofSettings.enable
-          then "1"
-          else "0"
-        }
-        export VM_BUILD=${vmDrv}
-        export VM_RUNNER_DIR=${vmDrv}/bin
-        export VM_DISK_PREALLOCATE=${
-          if vmSettings.resources.preallocateDisk
-          then "1"
-          else "0"
-        }
-        export VM_DISK_SIZE_MB=${toString vmConfig.virtualisation.diskSize}
-        export VM_DISK_PREPARER=${./scripts/prepare-vm-disk.sh}
-        exec bash ${./scripts/run-vm.sh}
-
+        exec python3 ${./scripts/manage-vm.py} --project "''${CODING_VM_PROJECT_ROOT:-$PWD}" start "$@"
       '';
     };
   in {
-    nixosConfigurations.coding-vm = nixpkgs.lib.nixosSystem {
-      inherit system;
-      specialArgs = {inherit nixpkgs cachyos-kernel vmSettings;};
-      modules = [./hosts/coding-vm.nix];
+    lib = {
+      inherit mkVM;
+      defaultSettings = defaultVM.effectiveSettings;
     };
-
+    nixosConfigurations.coding-vm = defaultVM.nixosConfiguration;
     packages.${system} = {
-      run-vm = runVm;
-      default = runVm;
+      run-vm = managedVm;
+      default = managedVm;
     };
-
     apps.${system} = {
       run-vm = {
         type = "app";
-        program = "${runVm}/bin/run-vm";
+        program = "${managedVm}/bin/run-vm";
       };
+      default = self.apps.${system}.run-vm;
     };
-
+    templates.default = {
+      path = ./templates/instance;
+      description = "A coding VM instance with its own settings and lock file";
+    };
     devShells.${system} = {
       tools = pkgs.mkShell {
         packages = with pkgs; [alejandra shfmt shellcheck python3 openssh curl iproute2 passt qemu_kvm e2fsprogs util-linux];
       };
 
       default = pkgs.mkShell {
-        packages = [
-          runVm
-          pkgs.git
-          pkgs.openssh
-          pkgs.python3
-          pkgs.sshfs
-        ];
-
+        packages = [managedVm pkgs.git pkgs.openssh pkgs.python3 pkgs.sshfs];
         shellHook = ''
           export CODING_VM_PROJECT_ROOT="$PWD"
           echo "Start the VM: run-vm"

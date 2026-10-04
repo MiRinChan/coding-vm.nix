@@ -9,11 +9,11 @@ lib.mkIf vmSettings.spoofSettings.enable {
 
   i18n.defaultLocale = vmSettings.spoofSettings.region.locale;
 
-  console.keyMap = "us";
+  console.keyMap = vmSettings.spoofSettings.region.consoleKeyMap;
 
   environment.variables = {
-    LANGUAGE = "en_US:en";
-    PAPERSIZE = "letter";
+    LANGUAGE = vmSettings.spoofSettings.region.language;
+    PAPERSIZE = vmSettings.spoofSettings.region.paperSize;
   };
 
   location = {
@@ -27,8 +27,8 @@ lib.mkIf vmSettings.spoofSettings.enable {
     enableStatic = true;
     staticLatitude = vmSettings.spoofSettings.region.latitude;
     staticLongitude = vmSettings.spoofSettings.region.longitude;
-    staticAltitude = 10;
-    staticAccuracy = 50000;
+    staticAltitude = vmSettings.spoofSettings.region.altitude;
+    staticAccuracy = vmSettings.spoofSettings.region.accuracy;
 
     enableWifi = false;
     enable3G = false;
@@ -44,8 +44,8 @@ lib.mkIf vmSettings.spoofSettings.enable {
     };
   };
   programs.firefox.policies.Preferences = {
-    "intl.accept_languages" = "en-US,en";
-    "browser.search.region" = "US";
+    "intl.accept_languages" = vmSettings.spoofSettings.region.browserLanguages;
+    "browser.search.region" = vmSettings.spoofSettings.region.browserRegion;
     "browser.region.network.url" = "";
     "browser.region.update.enabled" = false;
     "geo.enabled" = true;

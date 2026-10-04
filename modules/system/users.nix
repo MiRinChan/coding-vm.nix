@@ -1,10 +1,10 @@
 {vmSettings, ...}: {
-  users.mutableUsers = false;
+  users.mutableUsers = vmSettings.security.mutableUsers;
   users.users.${vmSettings.user} = {
     isNormalUser = true;
-    extraGroups = ["wheel" "render" "video"];
-    initialPassword = "change-me";
+    extraGroups = vmSettings.security.extraGroups;
+    initialPassword = vmSettings.security.initialPassword;
   };
 
-  security.sudo.wheelNeedsPassword = false;
+  security.sudo.wheelNeedsPassword = vmSettings.security.wheelNeedsPassword;
 }

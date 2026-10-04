@@ -6,15 +6,7 @@
 }: {
   services.openssh = {
     enable = true;
-    settings = {
-      PasswordAuthentication = false;
-      KbdInteractiveAuthentication = false;
-      PermitRootLogin = "no";
-      PubkeyAuthentication = true;
-
-      X11Forwarding = true;
-      X11UseLocalhost = true;
-    };
+    settings = vmSettings.security.ssh;
   };
 
   # Install the host-generated public key before sshd is used.

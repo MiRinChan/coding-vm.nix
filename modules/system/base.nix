@@ -2,9 +2,10 @@
   pkgs,
   lib,
   nixpkgs,
+  vmSettings,
   ...
 }: {
-  system.stateVersion = "25.11";
+  system.stateVersion = vmSettings.systemStateVersion;
   nix.settings.experimental-features = ["nix-command" "flakes"];
 
   # Make `nix shell nixpkgs#...` resolve to this flake's nixpkgs input
@@ -14,8 +15,5 @@
 
   # vscode and claude-code are unfree packages in nixpkgs.
   nixpkgs.config.allowUnfreePredicate = pkg:
-    builtins.elem (lib.getName pkg) [
-      "vscode"
-      "claude-code"
-    ];
+    builtins.elem (lib.getName pkg) vmSettings.software.allowedUnfree;
 }

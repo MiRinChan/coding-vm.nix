@@ -1,9 +1,14 @@
-{pkgs, ...}: {
+{
+  pkgs,
+  lib,
+  vmSettings,
+  ...
+}: {
   # Desktop applications connect through host display and SSH services.
   services.xserver.enable = false;
 
   programs.firefox = {
-    enable = true;
+    enable = vmSettings.software.firefox;
     policies = {
       DisableTelemetry = true;
       Preferences = {
@@ -24,10 +29,5 @@
     gtk-theme-name=Breeze
     gtk-decoration-layout=:minimize,maximize,close
   '';
-  fonts.packages = with pkgs; [
-    noto-fonts
-    noto-fonts-cjk-sans
-    noto-fonts-cjk-serif
-    noto-fonts-color-emoji
-  ];
+  fonts.packages = map (name: lib.getAttrFromPath (lib.splitString "." name) pkgs) vmSettings.software.fonts;
 }

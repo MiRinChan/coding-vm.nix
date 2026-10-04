@@ -2,7 +2,9 @@
 set -euo pipefail
 
 # SSH connection defaults for the development VM.
-host="coding-vm"
+host="${VM_SSH_ALIAS:-coding-vm}"
+export VM_SSH_ALIAS="$host"
+nofile_limit="${VM_NOFILE_LIMIT:-2097152}"
 port="${VM_SSH_PORT:-2223}"
 user="${VM_USER:-alice}"
 
@@ -49,7 +51,7 @@ export VM_FS_REMOTE="${VM_FS_REMOTE:-/home/$user}"
 
 runtime_base="${XDG_RUNTIME_DIR:-/tmp}"
 uid="$(id -u)"
-export VM_FS_REAL_MOUNT_DIR="${VM_FS_REAL_MOUNT_DIR:-$runtime_base/coding-vm-$uid/virtualMachine}"
+export VM_FS_REAL_MOUNT_DIR="${VM_FS_REAL_MOUNT_DIR:-$runtime_base/$host-$uid/virtualMachine}"
 
 # NixOS supplies the privileged FUSE helper outside the store.
 fuse_unmount="$(command -v fusermount3)"
@@ -87,12 +89,17 @@ mkdir -p "$gc_roots"
 nix-store --add-root "$gc_roots/$(basename "$VM_BUILD")" \
 	--indirect --realise "$VM_BUILD" >/dev/null
 
+if [ -n "${VM_MANAGED_RUNNER_ROOT:-}" ]; then
+	nix-store --add-root "$gc_roots/managed-running-launcher" \
+		--indirect --realise "$VM_MANAGED_RUNNER_ROOT" >/dev/null
+fi
+
 # A user service cannot exceed the user manager's hard limit.
 manager_pid="$(systemctl show "user@$uid.service" --property=MainPID --value)"
 manager_limit="$(awk '/^Max open files/ {print $5}' "/proc/$manager_pid/limits")"
-if [ "$manager_limit" != unlimited ] && [ "$manager_limit" -lt 2097152 ]; then
-	echo "The user manager needs a hard NOFILE limit of 2097152." >&2
-	echo "Run: sudo prlimit --pid $manager_pid --nofile=2097152:2097152" >&2
+if [ "$manager_limit" != unlimited ] && [ "$manager_limit" -lt "$nofile_limit" ]; then
+	echo "The user manager needs a hard NOFILE limit of $nofile_limit." >&2
+	echo "Run: sudo prlimit --pid $manager_pid --nofile=$nofile_limit:$nofile_limit" >&2
 	exit 1
 fi
 
@@ -164,11 +171,11 @@ tmp_config="$(mktemp)"
 awk '
             function is_host_line() { return $0 ~ /^[[:space:]]*Host[[:space:]]+/ }
             function is_match_line() { return $0 ~ /^[[:space:]]*Match[[:space:]]+/ }
-            function is_managed_begin() { return $0 ~ /^[[:space:]]*# BEGIN coding-vm managed( block)?[[:space:]]*$/ }
-            function is_managed_end() { return $0 ~ /^[[:space:]]*# END coding-vm managed( block)?[[:space:]]*$/ }
+            function is_managed_begin() { return $0 ~ "^[[:space:]]*# BEGIN " ENVIRON["VM_SSH_ALIAS"] " managed( block)?[[:space:]]*$" }
+            function is_managed_end() { return $0 ~ "^[[:space:]]*# END " ENVIRON["VM_SSH_ALIAS"] " managed( block)?[[:space:]]*$" }
             function is_vm_host_line() {
               for (i = 2; i <= NF; i++) {
-                if ($i == "coding-vm" || $i == "coding-vm-iso") {
+                if ($i == ENVIRON["VM_SSH_ALIAS"] || $i == ENVIRON["VM_SSH_ALIAS"] "-iso") {
                   return 1
                 }
               }
@@ -208,7 +215,7 @@ rm -f "$tmp_config"
 
 cat >>"$ssh_config" <<EOF
 
-# BEGIN coding-vm managed
+# BEGIN $host managed
 Host $host
   HostName 127.0.0.1
   Port $port
@@ -217,7 +224,7 @@ Host $host
   IdentitiesOnly yes
   StrictHostKeyChecking accept-new
   UserKnownHostsFile $known_hosts
-# END coding-vm managed
+# END $host managed
 EOF
 
 if [ "${OPEN_VSCODE:-1}" = "1" ]; then
@@ -251,9 +258,9 @@ fi
 
 echo "Starting VM. QEMU log: $vm_log"
 
-vm_scope_unit="coding-vm-qemu-${BASHPID}"
+vm_scope_unit="$host-qemu-${BASHPID}"
 systemd-run --user --unit="$vm_scope_unit" --service-type=exec \
-	--property=LimitNOFILE=2097152 --wait --pipe --collect --quiet \
+	--property=LimitNOFILE="$nofile_limit" --wait --pipe --collect --quiet \
 	--working-directory="$VM_STATE_DIR" \
 	--setenv="NIX_DISK_IMAGE=$NIX_DISK_IMAGE" --setenv="SHARED_DIR=$SHARED_DIR" \
 	--setenv="QEMU_OPTS=${QEMU_OPTS:-}" \
@@ -269,7 +276,7 @@ stop_vm() {
 }
 
 network_guard() {
-	while sleep 2; do
+	while sleep "${VM_NETWORK_GUARD_INTERVAL:-2}"; do
 		if ! tailscale status --json | python3 -c '
 import json, sys
 
@@ -381,11 +388,11 @@ fi
 if [ "${OPEN_KITTY_SSH:-1}" = "1" ] && command -v kitty >/dev/null 2>&1; then
 	echo "Opening kitty SSH session..."
 	if [ -n "${KITTY_WINDOW_ID:-}" ]; then
-		kitty @ launch --type=tab --tab-title "coding-vm" ssh "$host" 9>&- >/dev/null 2>&1 ||
-			kitty --detach --title "coding-vm" ssh "$host" 9>&- >/dev/null 2>&1 ||
+		kitty @ launch --type=tab --tab-title "$host" ssh "$host" 9>&- >/dev/null 2>&1 ||
+			kitty --detach --title "$host" ssh "$host" 9>&- >/dev/null 2>&1 ||
 			true
 	else
-		kitty --detach --title "coding-vm" ssh "$host" 9>&- >/dev/null 2>&1 || true
+		kitty --detach --title "$host" ssh "$host" 9>&- >/dev/null 2>&1 || true
 	fi
 fi
 
@@ -399,7 +406,7 @@ if [ "${MOUNT_SSHFS:-1}" = "1" ]; then
 			-o IdentityFile="$key" \
 			-o port="$port" \
 			-o StrictHostKeyChecking=accept-new \
-			-o UserKnownHostsFile="$known_hosts"
+			-o UserKnownHostsFile="$known_hosts" 9>&-
 	fi
 fi
 if [ "${OPEN_VSCODE:-1}" = "1" ]; then

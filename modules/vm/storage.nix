@@ -7,12 +7,12 @@
     cores = vmSettings.resources.cores;
     memorySize = vmSettings.resources.memoryMiB;
     diskSize = vmSettings.resources.diskMiB;
-    writableStore = true;
-    writableStoreUseTmpfs = true;
+    writableStore = vmSettings.storage.writableStore;
+    writableStoreUseTmpfs = vmSettings.storage.writableStoreUseTmpfs;
 
     fileSystems."/" = {
-      autoResize = true;
-      options = ["noatime"];
+      autoResize = vmSettings.storage.autoResize;
+      options = vmSettings.storage.rootOptions;
     };
     qemu.drives = lib.mkForce [
       {
@@ -20,10 +20,10 @@
         file = ''"$NIX_DISK_IMAGE"'';
         driveExtraOpts = {
           format = "qcow2";
-          cache = "none";
-          aio = "native";
-          discard = "ignore";
-          werror = "report";
+          cache = vmSettings.storage.cache;
+          aio = vmSettings.storage.aio;
+          discard = vmSettings.storage.discard;
+          werror = vmSettings.storage.writeError;
         };
         deviceExtraOpts = {
           bootindex = "1";
@@ -36,6 +36,6 @@
   };
   # Avoid a second I/O scheduler above the host's storage scheduler.
   services.udev.extraRules = ''
-    ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vd[a-z]", ATTR{queue/scheduler}="none"
+    ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="vd[a-z]", ATTR{queue/scheduler}="${vmSettings.storage.scheduler}"
   '';
 }
