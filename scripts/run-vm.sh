@@ -9,7 +9,19 @@ port="${VM_SSH_PORT:-2223}"
 user="${VM_USER:-alice}"
 
 if [ "${VM_REQUIRE_TAILSCALE_EXIT:-1}" = "1" ]; then
-	tailscale status --json | python3 -c '
+	tailscale_cli="${VM_TAILSCALE_BIN:-}"
+	if [ -z "$tailscale_cli" ]; then
+		if [ -x /run/current-system/sw/bin/tailscale ]; then
+			tailscale_cli=/run/current-system/sw/bin/tailscale
+		else
+			tailscale_cli="$(command -v tailscale || true)"
+		fi
+	fi
+	if [ -z "$tailscale_cli" ] || [ ! -x "$tailscale_cli" ]; then
+		echo "Cannot find the host Tailscale client. Set VM_TAILSCALE_BIN to its executable path." >&2
+		exit 1
+	fi
+	"$tailscale_cli" status --json | python3 -c '
 import json, sys
 status = json.load(sys.stdin)
 exit_node = status.get("ExitNodeStatus") or {}
@@ -292,7 +304,7 @@ stop_vm() {
 
 network_guard() {
 	while sleep "${VM_NETWORK_GUARD_INTERVAL:-2}"; do
-		if ! tailscale status --json | python3 -c '
+		if ! "$tailscale_cli" status --json | python3 -c '
 import json, sys
 
 status = json.load(sys.stdin)

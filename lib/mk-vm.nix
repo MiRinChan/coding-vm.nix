@@ -29,7 +29,6 @@
       pkgs.qemu_kvm
       pkgs.e2fsprogs
       pkgs.iproute2
-      pkgs.tailscale
       pkgs.openssh
       pkgs.python3
       pkgs.sshfs

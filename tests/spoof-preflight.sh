@@ -11,7 +11,7 @@ exit 1
 MOCK
 chmod +x "$work/tailscale"
 PATH="$work:$PATH" VM_REQUIRE_TAILSCALE_EXIT=0 bash "$work/preflight.sh"
-if PATH="$work:$PATH" VM_REQUIRE_TAILSCALE_EXIT=1 bash "$work/preflight.sh" >/dev/null 2>&1; then
+if PATH="$work:$PATH" VM_TAILSCALE_BIN="$work/tailscale" VM_REQUIRE_TAILSCALE_EXIT=1 bash "$work/preflight.sh" >/dev/null 2>&1; then
 	echo "FAIL: spoof mode accepted an unavailable exit node" >&2
 	exit 1
 fi
