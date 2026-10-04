@@ -1,0 +1,6 @@
+.vm-state/
+virtualMachine
+result
+result-*
+__pycache__/
+*.pyc

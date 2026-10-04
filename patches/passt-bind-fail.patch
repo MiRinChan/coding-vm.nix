@@ -1,0 +1,28 @@
+--- a/tcp.c
++++ b/tcp.c
+@@ -1652,10 +1652,8 @@
+ 			if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
+ 				       c->ip4.ifname_out,
+ 				       strlen(c->ip4.ifname_out))) {
+-				flow_warn_perror_ratelimit(
+-					conn, now,
+-					"Can't bind IPv4 TCP socket to interface %s",
+-					c->ip4.ifname_out);
++				die_perror("Can't bind IPv4 TCP socket to interface %s",
++					   c->ip4.ifname_out);
+ 			}
+ 		}
+ 	} else if (bind_sa.sa_family == AF_INET6) {
+@@ -1663,10 +1661,8 @@
+ 			if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
+ 				       c->ip6.ifname_out,
+ 				       strlen(c->ip6.ifname_out))) {
+-				flow_warn_perror_ratelimit(
+-					conn, now,
+-					"Can't bind IPv6 TCP socket to interface %s",
+-					c->ip6.ifname_out);
++				die_perror("Can't bind IPv6 TCP socket to interface %s",
++					   c->ip6.ifname_out);
+ 			}
+ 		}
+ 	}
